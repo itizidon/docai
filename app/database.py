@@ -2,7 +2,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 
-DATABASE_URL = "postgresql://user:password@localhost:5432/mydb"
+DATABASE_URL = "postgresql://don:jqh40ybn6P%21@localhost:5432/ragproject"
 
 engine = create_engine(DATABASE_URL)
 SessionLocal = sessionmaker(bind=engine)
@@ -14,3 +14,4 @@ def get_db():
         yield db
     finally:
         db.close()
+

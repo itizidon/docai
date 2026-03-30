@@ -1,6 +1,7 @@
 from app.database import Base
-from sqlalchemy import Column, Integer, String, ForeignKey, Table
+from sqlalchemy import Column, Integer, String, ForeignKey, Table, Text, DateTime
 from sqlalchemy.orm import relationship
+from sqlalchemy.sql import func
 
 # Junction table
 user_business = Table(
@@ -26,3 +27,45 @@ class Business(Base):
     name = Column(String, nullable=False)
     rag_data = Column(String)
     users = relationship("User", secondary=user_business, back_populates="businesses")
+    documents = relationship("Document", back_populates="business", cascade="all, delete-orphan")
+    query_logs = relationship("QueryLog", back_populates="business", cascade="all, delete-orphan")
+
+
+class Document(Base):
+    __tablename__ = "documents"
+
+    id = Column(Integer, primary_key=True, index=True)
+    business_id = Column(Integer, ForeignKey("businesses.id"), nullable=False, index=True)
+    filename = Column(String, nullable=False)
+    content = Column(Text, nullable=False)
+    status = Column(String, nullable=False, default="ready")
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+    business = relationship("Business", back_populates="documents")
+    chunks = relationship("Chunk", back_populates="document", cascade="all, delete-orphan")
+
+
+class Chunk(Base):
+    __tablename__ = "chunks"
+
+    id = Column(Integer, primary_key=True, index=True)
+    business_id = Column(Integer, ForeignKey("businesses.id"), nullable=False, index=True)
+    document_id = Column(Integer, ForeignKey("documents.id"), nullable=False, index=True)
+    chunk_index = Column(Integer, nullable=False)
+    text = Column(Text, nullable=False)
+    embedding = Column(Text, nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+    document = relationship("Document", back_populates="chunks")
+
+
+class QueryLog(Base):
+    __tablename__ = "query_logs"
+
+    id = Column(Integer, primary_key=True, index=True)
+    business_id = Column(Integer, ForeignKey("businesses.id"), nullable=False, index=True)
+    query_text = Column(Text, nullable=False)
+    answer = Column(Text, nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+    business = relationship("Business", back_populates="query_logs")
