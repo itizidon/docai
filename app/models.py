@@ -13,7 +13,7 @@ user_business = Table(
 
 class User(Base):
     __tablename__ = "users"
-
+    hashed_password = Column(String, nullable=False)
     id = Column(Integer, primary_key=True, index=True)
     email = Column(String, unique=True, nullable=False)
     name = Column(String, nullable=False)
