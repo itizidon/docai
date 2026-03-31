@@ -6,7 +6,6 @@ from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models import User
-from app.auth import get_current_user, require_admin
 
 SECRET_KEY      = "CHANGE_THIS_TO_A_LONG_RANDOM_STRING_IN_PRODUCTION"
 ALGORITHM       = "HS256"
