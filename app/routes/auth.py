@@ -1,69 +1,81 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+# app/routes/auth_routes.py
+from fastapi import APIRouter, Depends, HTTPException, Response, status, Request
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 from pydantic import BaseModel, EmailStr
+
 from app.database import get_db
 from app.models import User
-from app.auth import hash_password, verify_password, create_token, get_current_user
+from app.auth import (
+    hash_password,
+    verify_password,
+    set_jwt_cookie,
+    remove_jwt_cookie,
+    create_token,
+    get_current_user,
+)
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 
-
-# ── Schemas ────────────────────────────────────────────────────────────────────
+# ── SCHEMAS ─────────────────────────────────────────────────────────────────────
 class SignupRequest(BaseModel):
-    name:     str
-    email:    EmailStr
+    name: str
+    email: EmailStr
     password: str
 
-class TokenResponse(BaseModel):
-    access_token: str
-    token_type:   str = "bearer"
 
 class UserResponse(BaseModel):
-    id:    int
-    name:  str
+    id: int
+    name: str
     email: str
-    role:  str
+    role: str
 
     class Config:
         from_attributes = True
 
 
-# ── Routes ─────────────────────────────────────────────────────────────────────
-@router.post("/signup", response_model=TokenResponse, status_code=201)
-def signup(body: SignupRequest, db: Session = Depends(get_db)):
+# ── ROUTES ──────────────────────────────────────────────────────────────────────
+@router.post("/signup", response_model=UserResponse, status_code=201)
+def signup(body: SignupRequest, response: Response, db: Session = Depends(get_db)):
     if db.query(User).filter(User.email == body.email).first():
         raise HTTPException(status_code=400, detail="Email already registered")
 
     user = User(
-        name            = body.name,
-        email           = body.email,
-        hashed_password = hash_password(body.password),
+        name=body.name,
+        email=body.email,
+        hashed_password=hash_password(body.password),
     )
     db.add(user)
     db.commit()
     db.refresh(user)
 
-    return TokenResponse(access_token=create_token(user.id))
+    set_jwt_cookie(response, user.id)
+    return UserResponse.from_orm(user)
 
 
-@router.post("/login", response_model=TokenResponse)
-def login(form: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
+@router.post("/login", response_model=UserResponse)
+def login(
+    form: OAuth2PasswordRequestForm = Depends(),
+    response: Response = None,
+    db: Session = Depends(get_db),
+):
     user = db.query(User).filter(User.email == form.username).first()
     if not user or not verify_password(form.password, user.hashed_password):
         raise HTTPException(
-            status_code = status.HTTP_401_UNAUTHORIZED,
-            detail      = "Invalid email or password",
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid email or password",
         )
-    return TokenResponse(access_token=create_token(user.id))
+
+    set_jwt_cookie(response, user.id)
+    return UserResponse.from_orm(user)
+
+
+@router.post("/logout")
+def logout(response: Response):
+    remove_jwt_cookie(response)
+    return {"message": "Logged out successfully"}
 
 
 @router.get("/me", response_model=UserResponse)
 def me(current_user: User = Depends(get_current_user)):
     return current_user
-
-
-@router.post("/logout")
-def logout():
-    # JWT is stateless — logout is handled client-side by deleting the token
-    return {"message": "Logged out successfully"}

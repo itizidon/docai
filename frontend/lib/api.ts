@@ -1,10 +1,9 @@
+// lib/api.ts
 const DEFAULT_API = "http://localhost:8000";
 
 export function getApiBaseUrl(): string {
   return (process.env.NEXT_PUBLIC_API_URL ?? DEFAULT_API).replace(/\/$/, "");
 }
-
-export const TOKEN_KEY = "access_token";
 
 export type TokenResponse = {
   access_token: string;
@@ -39,11 +38,7 @@ export async function apiLogin(email: string, password: string): Promise<TokenRe
   return data as TokenResponse;
 }
 
-export async function apiSignup(
-  name: string,
-  email: string,
-  password: string,
-): Promise<TokenResponse> {
+export async function apiSignup(name: string, email: string, password: string): Promise<TokenResponse> {
   const res = await fetch(`${getApiBaseUrl()}/api/auth/signup`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },

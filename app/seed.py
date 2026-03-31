@@ -52,7 +52,8 @@ def seed():
             db.flush()
             print("  Created user: test@example.com")
         else:
-            print("  User already exists, skipping.")
+            user.hashed_password = hash_password("testpass123")
+            print("  User already exists, password reset for local dev.")
 
         # Link user to business
         if business not in user.businesses:
