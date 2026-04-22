@@ -35,8 +35,9 @@ export default function DashboardSearchMock() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const fileRef = useRef<HTMLInputElement>(null);
+  const [businessName, setBusinessName] = useState("");
   const [sources, setSources] = useState<{ id: number; filename: string }[]>([]);
-  console.log()
+  console.log(docs)
   // ── Fetch documents with merge to avoid overwriting pending files ──
   useEffect(() => {
     const fetchDocuments = async () => {
@@ -66,6 +67,23 @@ export default function DashboardSearchMock() {
 
     fetchDocuments();
   }, [page]);
+
+  useEffect(() => {
+    const fetchBusiness = async () => {
+      try {
+        const res = await fetch("http://localhost:8000/me/business", {
+          credentials: "include",
+        });
+
+        const data = await res.json();
+        setBusinessName(data.name);
+      } catch (err) {
+        console.error("Failed to fetch business name", err);
+      }
+    };
+
+    fetchBusiness();
+  }, []);
 
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -162,8 +180,23 @@ export default function DashboardSearchMock() {
     }
   };
 
-  const removeDoc = (id: string) => {
-    setDocs(prev => prev.filter(d => d.id !== id));
+  const removeDoc = async (doc: Doc) => {
+    if (!doc.backendId) {
+      console.warn("No backendId yet, cannot delete");
+      return;
+    }
+
+    try {
+      await fetch(`http://localhost:8000/documents/${doc.backendId}`, {
+        method: "DELETE",
+        credentials: "include",
+      });
+
+      setDocs(prev => prev.filter(d => d.id !== doc.id));
+
+    } catch (err) {
+      console.error("Delete failed", err);
+    }
   };
 
   return (
@@ -215,7 +248,7 @@ export default function DashboardSearchMock() {
                     {doc.status === "failed" && "❌ Failed"}
                   </div>
                 </div>
-                <button style={s.delBtn} onClick={() => removeDoc(doc.id)}>×</button>
+                <button style={s.delBtn} onClick={() => removeDoc(doc)}>×</button>
               </div>
             );
           })}
@@ -230,7 +263,9 @@ export default function DashboardSearchMock() {
       <div style={s.main}>
         <div className="flex h-full w-full flex-col items-center justify-center">
           <div className="mb-8">
-            <h1 className="text-5xl font-bold text-blue-600">Ryan's Pharmacy Search</h1>
+            <h1 className="text-5xl font-bold text-blue-600 text-center">
+              {businessName || "Loading..."}
+            </h1>
           </div>
 
           <form
@@ -260,54 +295,39 @@ export default function DashboardSearchMock() {
 
           {/* Answer Card */}
           {answer && !loading && (
-            <div className="mt-6 w-full max-w-2xl rounded-2xl border border-gray-700 bg-gray-900 p-6 shadow-lg transition-all duration-300">
+            <div className="mt-8 w-full max-w-2xl">
 
-              {/* Header */}
-              <div className="mb-4 flex items-center justify-between">
-                <span className="text-sm font-semibold text-blue-400">
-                  Answer
-                </span>
-              </div>
+              <div className="relative rounded-3xl bg-gray-900 border border-gray-800 shadow-2xl overflow-hidden">
 
-              {/* Answer Content */}
-              <div className="text-gray-200 text-[15px] leading-relaxed whitespace-pre-wrap">
-                {answer.split("\n").map((line, i) => (
-                  <p key={i} className="mb-2">
-                    {line}
-                  </p>
-                ))}
-              </div>
+                {/* Glow Accent */}
+                <div className="absolute inset-0 bg-gradient-to-br from-blue-600/10 via-transparent to-purple-600/10 pointer-events-none" />
 
-              {/* Sources Section (optional, backend-ready) */}
-              {sources.length > 0 && (
-                <div className="mt-5 border-t border-gray-700 pt-4">
-                  <div className="text-xs text-gray-400 mb-2">Sources</div>
+                {/* Inner Content */}
+                <div className="relative p-6">
 
-                  <ul className="space-y-1">
-                    {sources.map((s) => (
-                      <li
-                        key={s.id}
-                        className="text-sm text-gray-300 hover:text-blue-400 cursor-pointer transition"
-                      >
-                        [{s.id}] {s.filename}
-                      </li>
-                    ))}
-                  </ul>
+
+                  {/* Answer Content */}
+                  <div className="space-y-3 text-gray-200 text-[15px] leading-relaxed max-h-64 overflow-y-auto pr-2 scrollbar-thin scrollbar-thumb-zinc-700 scrollbar-track-transparent">
+                    {answer.split("\n").map((line, i) => {
+                      if (line.includes(":")) {
+                        const [title, ...rest] = line.split(":");
+                        return (
+                          <p key={i}>
+                            <span className="font-semibold text-white">{title}:</span>
+                            {rest.join(":")}
+                          </p>
+                        );
+                      }
+                      return <p key={i}>{line}</p>;
+                    })}
+
+                  </div>
                 </div>
-              )}
+              </div>
             </div>
           )}
-          <div className="mt-6 flex space-x-4">
-            <button className="rounded px-4 py-2 text-sm text-gray-100 hover:bg-gray-700">
-              Ryan's Pharmacy Search
-            </button>
-            <button className="rounded px-4 py-2 text-sm text-gray-100 hover:bg-gray-700">
-              I'm Feeling Lucky
-            </button>
-          </div>
-
           <p style={s.supportedTypes}>
-            Supported: PDF, DOCX, TXT, MD, CSV — max 10MB
+            Supported: PDF, DOCX, TXT, MD, CSV, XLSX, XLS — max 10MB
           </p>
         </div>
       </div>

@@ -176,5 +176,95 @@ def ask_question(
         "chunks_used": len(chunks)
     }
 
+@app.delete("/documents/{document_id}")
+def delete_document(
+    document_id: int,
+    db: Session = Depends(get_db),
+    current_context = Depends(get_current_user),
+):
+    user, business_id = current_context
+
+    # 1. Find document (and ensure it belongs to the user’s business)
+    doc = (
+        db.query(Document)
+        .filter(
+            Document.id == document_id,
+            Document.business_id == business_id
+        )
+        .first()
+    )
+
+    if not doc:
+        return {"error": "Document not found"}
+
+    # 2. Delete related chunks first
+    from app.models import Chunk
+    db.query(Chunk).filter(Chunk.document_id == document_id).delete()
+
+    # 3. Delete document
+    db.delete(doc)
+    db.commit()
+
+    return {"message": "Document deleted successfully"}
+
+@app.get("/me/business")
+def get_business(
+    db: Session = Depends(get_db),
+    current_context = Depends(get_current_user),
+):
+    user, business_id = current_context
+
+    business = db.query(Business).filter(Business.id == business_id).first()
+
+    if not business:
+        return {"name": None}
+
+    return {
+        "id": business.id,
+        "name": business.name
+    }
+
+@app.get("/queries/recent")
+def get_recent_queries(
+    page: int = Query(1, ge=1),
+    page_size: int = Query(10, ge=1, le=50),
+    db: Session = Depends(get_db),
+    current_context = Depends(get_current_user),
+):
+    user, business_id = current_context
+
+    if not business_id:
+        return {"error": "No business found"}
+
+    query = (
+        db.query(QueryLog)
+        .filter(QueryLog.business_id == business_id)
+        .order_by(QueryLog.id.desc())
+    )
+
+    total = query.count()
+
+    queries = (
+        query
+        .offset((page - 1) * page_size)
+        .limit(page_size)
+        .all()
+    )
+
+    return {
+        "page": page,
+        "page_size": page_size,
+        "total": total,
+        "has_more": page * page_size < total,
+        "queries": [
+            {
+                "id": q.id,
+                "question": q.query_text,
+                "answer": q.answer,
+            }
+            for q in queries
+        ],
+    }
+
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8000)
